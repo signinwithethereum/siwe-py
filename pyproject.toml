@@ -1,0 +1,59 @@
+[tool.poetry]
+name = "siwe"
+version = "4.4.0"
+description = "A Python implementation of Sign-In with Ethereum (EIP-4361)."
+license = "MIT OR Apache-2.0"
+authors = [
+  "Spruce Systems, Inc. <hello@spruceid.com>",
+  "Payton Garland <payton.r.g@gmail.com>",
+]
+readme = "README.md"
+homepage = "https://login.xyz"
+repository = "https://github.com/spruceid/siwe-py"
+keywords = ["SIWE", "EIP-4361", "Sign-In with Ethereum", "Spruce ID"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<4.0"
+abnf = ">=2.2,<3"
+web3 = ">=7.3.0,<8"
+eth-account = ">=0.13.1,<0.14"
+eth-typing = ">=3.4.0"         # peer of eth-account/web3
+eth-utils = ">=2.2.0"          # peer of eth-account/web3
+pydantic = ">=2.7,<3"
+pydantic-core = "^2"           # peer of pydantic
+typing-extensions = "^4"       # peer of pydantic
+
+[tool.poetry.dev-dependencies]
+pytest = ">=8.1"
+pyhumps = ">=3.8"
+ruff = ">=0.4"
+deptry = ">=0.16"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.urls]
+"EIP" = "https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4361.md"
+"Discord" = "https://discord.gg/Sf9tSFzrnt"
+
+[tool.pyright]
+typeCheckingMode = "basic"
+
+[tool.ruff]
+lint.select = [
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # isort
+  "C",   # flake8-comprehensions
+  "B",   # flake8-bugbear
+  "RUF", # ruff specific
+  "PT",  # flake8-pytest-style
+  "SIM", # flake8-simplify
+  "D",   # pydocstyle
+  "RUF", # ruff-specific rules
+]
+
+include = ["siwe/**"]
+lint.ignore = ["D203", "D213"]
