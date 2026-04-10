@@ -1,6 +1,6 @@
-# Sign-In with Ethereum
+# Sign in with Ethereum
 
-This package provides a Python implementation of EIP-4361: Sign In With Ethereum.
+This package provides a Python implementation of EIP-4361: Sign in With Ethereum.
 
 ## Installation
 
@@ -85,13 +85,13 @@ poetry run pytest
 
 ## See Also
 
-- [Sign-In with Ethereum: TypeScript](https://github.com/spruceid/siwe)
-- [Example SIWE application: login.xyz](https://login.xyz)
+- [Sign in with Ethereum: TypeScript](https://github.com/signinwithethereum/siwe)
+- [SIWE website: siwe.xyz](https://siwe.xyz)
 - [EIP-4361 Specification Draft](https://eips.ethereum.org/EIPS/eip-4361)
 - [EIP-191 Specification](https://eips.ethereum.org/EIPS/eip-191)
 
 ## Disclaimer
 
-Our Python library for Sign-In with Ethereum has not yet undergone a formal
+Our Python library for Sign in with Ethereum has not yet undergone a formal
 security audit. We welcome continued feedback on the usability, architecture,
 and security of this implementation.

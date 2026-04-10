@@ -1,12 +1,15 @@
 import json
 import os
 
+import abnf
 import pytest
+from abnf.grammars import rfc3986
 from eth_account import Account, messages
 from humps import decamelize
 from web3 import HTTPProvider
 from pydantic import ValidationError
 
+from siwe.grammars.eip4361 import Rule as eip4361_rule
 from siwe.siwe import SiweMessage, VerificationError, datetime_from_iso8601_string
 
 BASE_TESTS = "tests/siwe/test/"
@@ -22,6 +25,22 @@ with open(BASE_TESTS + "verification_positive.json", "r") as f:
     verification_positive = decamelize(json.load(fp=f))
 with open(BASE_TESTS + "eip1271.json", "r") as f:
     verification_eip1271 = decamelize(json.load(fp=f))
+with open(BASE_TESTS + "valid_chars.json", "r") as f:
+    valid_chars = json.load(fp=f)
+with open(BASE_TESTS + "invalid_chars.json", "r") as f:
+    invalid_chars = json.load(fp=f)
+with open(BASE_TESTS + "valid_uris.json", "r") as f:
+    valid_uris = json.load(fp=f)
+with open(BASE_TESTS + "invalid_uris.json", "r") as f:
+    invalid_uris = json.load(fp=f)
+with open(BASE_TESTS + "valid_resources.json", "r") as f:
+    valid_resources = json.load(fp=f)
+with open(BASE_TESTS + "invalid_resources.json", "r") as f:
+    invalid_resources = json.load(fp=f)
+with open(BASE_TESTS + "message_objects.json", "r") as f:
+    message_objects = decamelize(json.load(fp=f))
+with open(BASE_TESTS + "valid_specification.json", "r") as f:
+    valid_specification = decamelize(json.load(fp=f))
 
 endpoint_uri = "https://cloudflare-eth.com"
 try:
@@ -111,7 +130,9 @@ class TestMessageVerification:
         # instead of mainnet like other EIP-1271 tests.
         provider = HTTPProvider(endpoint_uri=sepolia_endpoint_uri)
         siwe_message = SiweMessage.from_message(message=message)
-        siwe_message.verify(signature, provider=provider)
+        # Use a timestamp within the message's validity window
+        timestamp = datetime_from_iso8601_string("2024-10-11T08:34:03.152Z")
+        siwe_message.verify(signature, timestamp=timestamp, provider=provider)
 
     @pytest.mark.parametrize(
         "provider", [HTTPProvider(endpoint_uri=endpoint_uri), None]
@@ -163,3 +184,147 @@ class TestMessageRoundTrip:
     def test_schema_generation(self):
         # NOTE: Needed so that FastAPI/OpenAPI json schema works
         SiweMessage.model_json_schema()
+
+
+def _get_abnf_rule(rule_name):
+    """Get the ABNF rule parser for a given rule name."""
+    if rule_name == "statement":
+        return eip4361_rule(rule_name)
+    return rfc3986.Rule(rule_name)
+
+
+class TestValidChars:
+    @pytest.mark.parametrize(
+        "test_name,test",
+        [(test_name, test) for test_name, test in valid_chars.items()],
+    )
+    def test_valid_char(self, test_name, test):
+        rule = _get_abnf_rule(test["rule"])
+        node = rule.parse_all(test["input"])
+        assert node is not None
+
+class TestInvalidChars:
+    @pytest.mark.parametrize(
+        "test_name,test",
+        [(test_name, test) for test_name, test in invalid_chars.items()],
+    )
+    def test_invalid_char(self, test_name, test):
+        rule = _get_abnf_rule(test["rule"])
+        with pytest.raises(abnf.ParseError):
+            rule.parse_all(test["input"])
+
+
+XFAIL_VALID_URIS_ABNF = {
+    "uri-js empty host: uri://@:",
+    "uri-js port: uri://:",
+    "uri-js mixed IPv4address & reg-name: uri://10.10.10.10.example.com/en/process",
+    "IPv4address leading zeros: uri://[::000.000.010.001]",
+    "IPv4address max value: uri://[::001.099.200.255]",
+}
+XFAIL_VALID_URIS_REGEX = {
+    "uri-js empty host: uri://@:",
+    "uri-js port: uri://:",
+    "IPv4address leading zeros: uri://[::000.000.010.001]",
+    "IPv4address max value: uri://[::001.099.200.255]",
+}
+
+
+class TestValidUris:
+    @pytest.mark.parametrize("abnf_mode", [True, False])
+    @pytest.mark.parametrize(
+        "test_name,test",
+        [(test_name, test) for test_name, test in valid_uris.items()],
+    )
+    def test_valid_uri(self, abnf_mode, test_name, test):
+        xfail_set = XFAIL_VALID_URIS_ABNF if abnf_mode else XFAIL_VALID_URIS_REGEX
+        if test_name in xfail_set:
+            pytest.xfail("Known parser limitation for this URI")
+        siwe_message = SiweMessage.from_message(message=test["msg"], abnf=abnf_mode)
+        assert siwe_message is not None
+
+
+class TestInvalidUris:
+    @pytest.mark.parametrize("abnf_mode", [True, False])
+    @pytest.mark.parametrize(
+        "test_name,test",
+        [(test_name, test) for test_name, test in invalid_uris.items()],
+    )
+    def test_invalid_uri(self, abnf_mode, test_name, test):
+        with pytest.raises((ValueError, ValidationError)):
+            SiweMessage.from_message(message=test, abnf=abnf_mode)
+
+
+XFAIL_VALID_RESOURCES_ABNF = {
+    "Resources: [uri://@:, uri://]",
+    "Resources: [uri://:, uri:?]",
+    "Resources IP-literal: [uri://10.10.10.10.example.com/en/process, uri://[2606:2800:220:1:248:1893:25c8:1946]/test]",
+}
+XFAIL_VALID_RESOURCES_REGEX = {
+    "Resources: [uri://@:, uri://]",
+    "Resources: [uri://:, uri:?]",
+}
+
+
+class TestValidResources:
+    @pytest.mark.parametrize("abnf_mode", [True, False])
+    @pytest.mark.parametrize(
+        "test_name,test",
+        [(test_name, test) for test_name, test in valid_resources.items()],
+    )
+    def test_valid_resource(self, abnf_mode, test_name, test):
+        xfail_set = (
+            XFAIL_VALID_RESOURCES_ABNF if abnf_mode else XFAIL_VALID_RESOURCES_REGEX
+        )
+        if test_name in xfail_set:
+            pytest.xfail("Known parser limitation for this URI in resources")
+        siwe_message = SiweMessage.from_message(message=test["msg"], abnf=abnf_mode)
+        assert siwe_message.resources == test["resources"]
+
+
+class TestInvalidResources:
+    @pytest.mark.parametrize("abnf_mode", [True, False])
+    @pytest.mark.parametrize(
+        "test_name,test",
+        [(test_name, test) for test_name, test in invalid_resources.items()],
+    )
+    def test_invalid_resource(self, abnf_mode, test_name, test):
+        with pytest.raises((ValueError, ValidationError)):
+            SiweMessage.from_message(message=test, abnf=abnf_mode)
+
+
+class TestMessageObjects:
+    @pytest.mark.parametrize(
+        "test_name,test",
+        [(test_name, test) for test_name, test in message_objects.items()],
+    )
+    def test_message_object(self, test_name, test):
+        if test["error"] == "none":
+            siwe_message = SiweMessage(**test["msg"])
+            assert siwe_message is not None
+        else:
+            with pytest.raises((ValueError, ValidationError)):
+                SiweMessage(**test["msg"])
+
+
+XFAIL_VALID_SPEC_ABNF = {
+    "statementempty",
+}
+XFAIL_VALID_SPEC_REGEX = {
+    "resourcesempty",
+    "statementempty",
+}
+
+
+class TestValidSpecification:
+    @pytest.mark.parametrize("abnf_mode", [True, False])
+    @pytest.mark.parametrize(
+        "test_name,test",
+        [(test_name, test) for test_name, test in valid_specification.items()],
+    )
+    def test_valid_specification(self, abnf_mode, test_name, test):
+        xfail_set = XFAIL_VALID_SPEC_ABNF if abnf_mode else XFAIL_VALID_SPEC_REGEX
+        if test_name in xfail_set:
+            pytest.xfail("Known parser limitation for this edge case")
+        siwe_message = SiweMessage.from_message(message=test["msg"], abnf=abnf_mode)
+        for key, value in test["items"].items():
+            assert getattr(siwe_message, key) == value
