@@ -12,34 +12,34 @@ from pydantic import ValidationError
 from siwe.grammars.eip4361 import Rule as eip4361_rule
 from siwe.siwe import SiweMessage, VerificationError, datetime_from_iso8601_string
 
-BASE_TESTS = "tests/siwe/test/"
-with open(BASE_TESTS + "parsing_positive.json", "r") as f:
+VECTORS = os.path.join(os.path.dirname(__file__), "../test-vectors/vectors")
+with open(os.path.join(VECTORS, "parsing/parsing_positive.json"), "r") as f:
     parsing_positive = decamelize(json.load(fp=f))
-with open(BASE_TESTS + "parsing_negative.json", "r") as f:
+with open(os.path.join(VECTORS, "parsing/parsing_negative.json"), "r") as f:
     parsing_negative = decamelize(json.load(fp=f))
-with open(BASE_TESTS + "parsing_negative_objects.json", "r") as f:
+with open(os.path.join(VECTORS, "parsing/parsing_negative_objects.json"), "r") as f:
     parsing_negative_objects = decamelize(json.load(fp=f))
-with open(BASE_TESTS + "verification_negative.json", "r") as f:
+with open(os.path.join(VECTORS, "verification/verification_negative.json"), "r") as f:
     verification_negative = decamelize(json.load(fp=f))
-with open(BASE_TESTS + "verification_positive.json", "r") as f:
+with open(os.path.join(VECTORS, "verification/verification_positive.json"), "r") as f:
     verification_positive = decamelize(json.load(fp=f))
-with open(BASE_TESTS + "eip1271.json", "r") as f:
+with open(os.path.join(VECTORS, "verification/eip1271.json"), "r") as f:
     verification_eip1271 = decamelize(json.load(fp=f))
-with open(BASE_TESTS + "valid_chars.json", "r") as f:
+with open(os.path.join(VECTORS, "grammar/valid_chars.json"), "r") as f:
     valid_chars = json.load(fp=f)
-with open(BASE_TESTS + "invalid_chars.json", "r") as f:
+with open(os.path.join(VECTORS, "grammar/invalid_chars.json"), "r") as f:
     invalid_chars = json.load(fp=f)
-with open(BASE_TESTS + "valid_uris.json", "r") as f:
+with open(os.path.join(VECTORS, "grammar/valid_uris.json"), "r") as f:
     valid_uris = json.load(fp=f)
-with open(BASE_TESTS + "invalid_uris.json", "r") as f:
+with open(os.path.join(VECTORS, "grammar/invalid_uris.json"), "r") as f:
     invalid_uris = json.load(fp=f)
-with open(BASE_TESTS + "valid_resources.json", "r") as f:
+with open(os.path.join(VECTORS, "grammar/valid_resources.json"), "r") as f:
     valid_resources = json.load(fp=f)
-with open(BASE_TESTS + "invalid_resources.json", "r") as f:
+with open(os.path.join(VECTORS, "grammar/invalid_resources.json"), "r") as f:
     invalid_resources = json.load(fp=f)
-with open(BASE_TESTS + "message_objects.json", "r") as f:
+with open(os.path.join(VECTORS, "objects/message_objects.json"), "r") as f:
     message_objects = decamelize(json.load(fp=f))
-with open(BASE_TESTS + "valid_specification.json", "r") as f:
+with open(os.path.join(VECTORS, "grammar/valid_specification.json"), "r") as f:
     valid_specification = decamelize(json.load(fp=f))
 
 endpoint_uri = "https://cloudflare-eth.com"
@@ -215,15 +215,12 @@ class TestInvalidChars:
 
 
 XFAIL_VALID_URIS_ABNF = {
-    "uri-js empty host: uri://@:",
-    "uri-js port: uri://:",
     "uri-js mixed IPv4address & reg-name: uri://10.10.10.10.example.com/en/process",
     "IPv4address leading zeros: uri://[::000.000.010.001]",
     "IPv4address max value: uri://[::001.099.200.255]",
 }
 XFAIL_VALID_URIS_REGEX = {
-    "uri-js empty host: uri://@:",
-    "uri-js port: uri://:",
+    "uri-js mixed IPv4address & reg-name: uri://10.10.10.10.example.com/en/process",
     "IPv4address leading zeros: uri://[::000.000.010.001]",
     "IPv4address max value: uri://[::001.099.200.255]",
 }
@@ -255,13 +252,10 @@ class TestInvalidUris:
 
 
 XFAIL_VALID_RESOURCES_ABNF = {
-    "Resources: [uri://@:, uri://]",
-    "Resources: [uri://:, uri:?]",
     "Resources IP-literal: [uri://10.10.10.10.example.com/en/process, uri://[2606:2800:220:1:248:1893:25c8:1946]/test]",
 }
 XFAIL_VALID_RESOURCES_REGEX = {
-    "Resources: [uri://@:, uri://]",
-    "Resources: [uri://:, uri:?]",
+    "Resources IP-literal: [uri://10.10.10.10.example.com/en/process, uri://[2606:2800:220:1:248:1893:25c8:1946]/test]",
 }
 
 
@@ -306,13 +300,8 @@ class TestMessageObjects:
                 SiweMessage(**test["msg"])
 
 
-XFAIL_VALID_SPEC_ABNF = {
-    "statementempty",
-}
-XFAIL_VALID_SPEC_REGEX = {
-    "resourcesempty",
-    "statementempty",
-}
+XFAIL_VALID_SPEC_ABNF = set()
+XFAIL_VALID_SPEC_REGEX = set()
 
 
 class TestValidSpecification:
