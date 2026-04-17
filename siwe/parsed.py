@@ -33,8 +33,12 @@ class RegExpParsedMessage:
         self.not_before = match.group(expr.groupindex["notBefore"])
         self.request_id = match.group(expr.groupindex["requestId"])
         self.resources = match.group(expr.groupindex["resources"])
-        if self.resources:
+        if self.resources is None:
+            pass
+        elif self.resources:
             self.resources = self.resources.split("\n- ")[1:]
+        else:
+            self.resources = []
 
 
 class ABNFParsedMessage:

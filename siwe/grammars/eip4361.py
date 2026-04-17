@@ -40,7 +40,7 @@ class Rule(_Rule):
         'Resources:" resources ]',
         "domain = authority",
         'address = "0x" 40HEXDIG',
-        'statement = 1*( reserved / unreserved / " " )',
+        'statement = *( reserved / unreserved / " " )',
         "uri = URI",
         'version = "1"',
         "nonce = 8*( ALPHA / DIGIT )",
