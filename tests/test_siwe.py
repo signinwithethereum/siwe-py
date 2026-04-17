@@ -17,7 +17,9 @@ with open(os.path.join(VECTORS, "parsing/parsing_positive.json"), "r") as f:
     parsing_positive = decamelize(json.load(fp=f))
 with open(os.path.join(VECTORS, "parsing/parsing_negative.json"), "r") as f:
     parsing_negative = decamelize(json.load(fp=f))
-with open(os.path.join(VECTORS, "parsing/parsing_negative_objects.json"), "r") as f:
+with open(os.path.join(VECTORS, "parsing/parsing_warnings.json"), "r") as f:
+    parsing_warnings = decamelize(json.load(fp=f))
+with open(os.path.join(VECTORS, "objects/parsing_negative_objects.json"), "r") as f:
     parsing_negative_objects = decamelize(json.load(fp=f))
 with open(os.path.join(VECTORS, "verification/verification_negative.json"), "r") as f:
     verification_negative = decamelize(json.load(fp=f))
@@ -90,6 +92,22 @@ class TestMessageParsing:
             SiweMessage(**test)
 
 
+class TestParsingWarnings:
+    @pytest.mark.parametrize("abnf", [True, False])
+    @pytest.mark.parametrize(
+        "test_name,test",
+        [(test_name, test) for test_name, test in parsing_warnings.items()],
+    )
+    def test_parsing_with_warnings(self, abnf, test_name, test):
+        siwe_message = SiweMessage.from_message(message=test["message"], abnf=abnf)
+        for key, value in test["fields"].items():
+            v = getattr(siwe_message, key)
+            if not (isinstance(v, int) or isinstance(v, list) or v is None):
+                v = str(v)
+            assert v == value
+        assert len(siwe_message.warnings) == test["expected_warnings"]
+
+
 class TestMessageGeneration:
     @pytest.mark.parametrize(
         "test_name,test",
@@ -159,6 +177,7 @@ class TestMessageVerification:
         with pytest.raises(VerificationError):
             siwe_message.verify(
                 test.get("signature"),
+                scheme=test.get("scheme"),
                 domain=domain_binding,
                 nonce=match_nonce,
                 timestamp=timestamp,
@@ -295,6 +314,7 @@ class TestMessageObjects:
         if test["error"] == "none":
             siwe_message = SiweMessage(**test["msg"])
             assert siwe_message is not None
+            assert len(siwe_message.warnings) == test.get("expected_warnings", 0)
         else:
             with pytest.raises((ValueError, ValidationError)):
                 SiweMessage(**test["msg"])
