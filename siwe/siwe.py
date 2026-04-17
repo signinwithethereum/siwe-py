@@ -6,17 +6,17 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Iterable, List, Optional
 
+import abnf
 import eth_utils
+from abnf.grammars import rfc3986
 from eth_account.messages import SignableMessage, _hash_eip191_message, encode_defunct
-from eth_typing import ChecksumAddress
 from pydantic import (
-    AnyUrl,
     BaseModel,
     BeforeValidator,
     Field,
     NonNegativeInt,
-    TypeAdapter,
     field_validator,
+    model_validator,
 )
 from pydantic_core import core_schema
 from typing_extensions import Annotated
@@ -143,13 +143,16 @@ class VersionEnum(str, Enum):
         return self.value
 
 
-# NOTE: Do not override the original uri string, just do validation
-# https://github.com/pydantic/pydantic/issues/7186#issuecomment-1874338146
-AnyUrlTypeAdapter = TypeAdapter(AnyUrl)
-AnyUrlStr = Annotated[
-    str,
-    BeforeValidator(lambda value: AnyUrlTypeAdapter.validate_python(value) and value),
-]
+def _validate_rfc3986_uri(value: str) -> str:
+    """Validate a URI string per RFC 3986."""
+    try:
+        rfc3986.Rule("URI").parse_all(value)
+    except abnf.ParseError:
+        raise ValueError(f"Invalid URI: {value}")
+    return value
+
+
+AnyUrlStr = Annotated[str, BeforeValidator(_validate_rfc3986_uri)]
 
 
 def datetime_from_iso8601_string(val: str) -> datetime:
@@ -202,7 +205,7 @@ class SiweMessage(BaseModel):
     """RFC 3986 URI scheme for the authority that is requesting the signing."""
     domain: str = Field(pattern="^[^/?#]+$")
     """RFC 4501 dns authority that is requesting the signing."""
-    address: ChecksumAddress
+    address: str
     """Ethereum address performing the signing conformant to capitalization encoded
     checksum specified in EIP-55 where applicable.
     """
@@ -216,12 +219,12 @@ class SiweMessage(BaseModel):
     """
     issued_at: ISO8601Datetime
     """ISO 8601 datetime string of the current time."""
-    nonce: str = Field(min_length=8)
+    nonce: str = Field(min_length=8, pattern="^[a-zA-Z0-9]+$")
     """Randomized token used to prevent replay attacks, at least 8 alphanumeric
     characters. Use generate_nonce() to generate a secure nonce and store it for
     verification later.
     """
-    statement: Optional[str] = Field(None, pattern="^[^\n]+$")
+    statement: Optional[str] = Field(None, pattern="^[^\n]*$")
     """Human-readable ASCII assertion that the user will sign, and it must not contain
     `\n`.
     """
@@ -242,14 +245,42 @@ class SiweMessage(BaseModel):
     as part of authentication by the relying party. They are expressed as RFC 3986 URIs
     separated by `\n- `.
     """
+    warnings: List[str] = Field(default_factory=list, exclude=True)
+    """Non-fatal warnings from validation (e.g. unchecksummed address)."""
 
     @field_validator("address")
     @classmethod
-    def address_is_checksum_address(cls, v: str) -> str:
-        """Validate the address follows EIP-55 formatting."""
-        if not Web3.is_checksum_address(v):
-            raise ValueError("Message `address` must be in EIP-55 format")
+    def validate_address(cls, v: str) -> str:
+        """Validate the address is well-formed hex with a correct EIP-55 checksum.
+
+        All-lowercase and all-uppercase addresses are accepted (they are valid
+        but unchecksummed — a warning is added by the model validator).  Mixed-
+        case addresses must pass the EIP-55 checksum or they are rejected.
+        """
+        if len(v) != 42 or not v.startswith("0x"):
+            raise ValueError(f"Invalid Ethereum address format: {v}")
+        hex_part = v[2:]
+        if not all(c in "0123456789abcdefABCDEF" for c in hex_part):
+            raise ValueError(f"Invalid Ethereum address: non-hex characters: {v}")
+        if (
+            hex_part != hex_part.lower()
+            and hex_part != hex_part.upper()
+            and not Web3.is_checksum_address(v)
+        ):
+            raise ValueError("invalid EIP-55 address")
         return v
+
+    @model_validator(mode="after")
+    def _check_address_warnings(self) -> "SiweMessage":
+        """Add a warning when the address is not EIP-55 checksummed."""
+        hex_part = self.address[2:]
+        if (
+            hex_part == hex_part.lower() or hex_part == hex_part.upper()
+        ) and not Web3.is_checksum_address(self.address):
+            self.warnings.append(
+                f"Address is not EIP-55 checksummed: {self.address}"
+            )
+        return self
 
     @classmethod
     def from_message(cls, message: str, abnf: bool = True) -> "SiweMessage":
@@ -388,7 +419,7 @@ class SiweMessage(BaseModel):
         except eth_utils.exceptions.ValidationError:
             raise InvalidSignature from None
 
-        if address != self.address and (
+        if (address is None or address.lower() != self.address.lower()) and (
             provider is None
             or not check_contract_wallet_signature(
                 address=self.address,
@@ -402,7 +433,7 @@ class SiweMessage(BaseModel):
 
 
 def check_contract_wallet_signature(
-    address: ChecksumAddress,
+    address: str,
     message: SignableMessage,
     signature: str,
     chain_id: int,
@@ -438,7 +469,7 @@ def check_contract_wallet_signature(
 
 
 def _check_eip6492_signature(
-    address: ChecksumAddress, hash_: bytes, signature: str, w3: Web3
+    address: str, hash_: bytes, signature: str, w3: Web3
 ) -> bool:
     """Verify an EIP-6492 signature using the universal validator bytecode."""
     sig_bytes = bytes.fromhex(signature[2:]) if signature.startswith("0x") else bytes.fromhex(signature)
@@ -455,7 +486,7 @@ def _check_eip6492_signature(
 
 
 def _check_eip1271_signature(
-    address: ChecksumAddress, hash_: bytes, signature: str, w3: Web3
+    address: str, hash_: bytes, signature: str, w3: Web3
 ) -> bool:
     """Verify an EIP-1271 signature via isValidSignature contract call."""
     contract = w3.eth.contract(address=address, abi=EIP1271_CONTRACT_ABI)
