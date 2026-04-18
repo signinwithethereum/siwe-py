@@ -15,7 +15,6 @@ dependencies = [
   "abnf>=2.2,<3",
   "web3>=7.3.0,<8",
   "eth-account>=0.13.1,<0.14",
-  "eth-typing>=3.4.0",
   "eth-utils>=2.2.0",
   "pydantic>=2.7,<3",
   "pydantic-core>=2,<3",
@@ -59,3 +58,6 @@ lint.select = [
 
 include = ["siwe/**"]
 lint.ignore = ["D203", "D213"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20

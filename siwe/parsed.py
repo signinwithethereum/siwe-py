@@ -19,7 +19,6 @@ class RegExpParsedMessage:
         if not match:
             raise ValueError("Message did not match the regular expression.")
 
-        self.match = match
         self.scheme = match.group(expr.groupindex["scheme"])
         self.domain = match.group(expr.groupindex["domain"])
         self.address = match.group(expr.groupindex["address"])

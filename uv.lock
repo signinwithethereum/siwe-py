@@ -1638,7 +1638,6 @@ source = { editable = "." }
 dependencies = [
     { name = "abnf" },
     { name = "eth-account" },
-    { name = "eth-typing" },
     { name = "eth-utils" },
     { name = "pydantic" },
     { name = "pydantic-core" },
@@ -1658,7 +1657,6 @@ dev = [
 requires-dist = [
     { name = "abnf", specifier = ">=2.2,<3" },
     { name = "eth-account", specifier = ">=0.13.1,<0.14" },
-    { name = "eth-typing", specifier = ">=3.4.0" },
     { name = "eth-utils", specifier = ">=2.2.0" },
     { name = "pydantic", specifier = ">=2.7,<3" },
     { name = "pydantic-core", specifier = ">=2,<3" },
