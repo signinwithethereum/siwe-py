@@ -201,9 +201,9 @@ def utc_now() -> datetime:
 class SiweMessage(BaseModel):
     """A Sign-in with Ethereum (EIP-4361) message."""
 
-    scheme: Optional[str] = None
+    scheme: Optional[str] = Field(None, pattern=r"^[a-zA-Z][a-zA-Z0-9+\-.]*$")
     """RFC 3986 URI scheme for the authority that is requesting the signing."""
-    domain: str = Field(pattern="^[^/?#]+$")
+    domain: str = Field(pattern=r"^[^\s/?#]+$")
     """RFC 4501 dns authority that is requesting the signing."""
     address: str
     """Ethereum address performing the signing conformant to capitalization encoded
@@ -331,7 +331,7 @@ class SiweMessage(BaseModel):
             request_id_field = f"Request ID: {self.request_id}"
             suffix_array.append(request_id_field)
 
-        if self.resources:
+        if self.resources is not None:
             resources_field = "\n".join(
                 ["Resources:"] + [f"- {resource}" for resource in self.resources]
             )
@@ -383,6 +383,8 @@ class SiweMessage(BaseModel):
                 raise VerificationError("Strict mode requires uri parameter")
             if chain_id is None:
                 raise VerificationError("Strict mode requires chain_id parameter")
+            if domain is None:
+                raise VerificationError("Strict mode requires domain parameter")
 
         message = encode_defunct(text=self.prepare_message())
         w3 = Web3(provider=provider)

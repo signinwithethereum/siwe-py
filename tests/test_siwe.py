@@ -252,6 +252,46 @@ class TestVerifyHardening:
             m.verify("0x" + "00" * 65, timestamp=datetime(2025, 1, 1))
 
 
+class TestFieldValidation:
+    base = dict(
+        domain="ex.com",
+        address="0x0000000000000000000000000000000000000000",
+        uri="https://ex.com",
+        version="1",
+        chain_id=1,
+        nonce="12345678",
+        issued_at="2024-01-01T00:00:00Z",
+    )
+
+    def test_rejects_domain_with_whitespace(self):
+        with pytest.raises(ValidationError):
+            SiweMessage(**{**self.base, "domain": "has space.com"})
+
+    def test_rejects_invalid_scheme(self):
+        with pytest.raises(ValidationError):
+            SiweMessage(**{**self.base, "scheme": "not a scheme!"})
+
+    def test_accepts_valid_scheme(self):
+        m = SiweMessage(**{**self.base, "scheme": "https"})
+        assert m.scheme == "https"
+
+    def test_empty_resources_round_trip(self):
+        m = SiweMessage(**{**self.base, "resources": []})
+        msg = m.prepare_message()
+        assert msg.endswith("Resources:")
+        reparsed = SiweMessage.from_message(msg)
+        assert reparsed.resources == []
+
+    def test_none_resources_omits_line(self):
+        m = SiweMessage(**self.base)
+        assert "Resources:" not in m.prepare_message()
+
+    def test_strict_mode_requires_domain(self):
+        m = SiweMessage(**self.base)
+        with pytest.raises(VerificationError):
+            m.verify("0x" + "00" * 65, uri="https://ex.com", chain_id=1, strict=True)
+
+
 def _get_abnf_rule(rule_name):
     """Get the ABNF rule parser for a given rule name."""
     if rule_name == "statement":
