@@ -55,19 +55,16 @@ Parsing and verifying a `SiweMessage` is easy:
 
 ```python
 try:
-    message: SiweMessage = SiweMessage(message=eip_4361_string)
-    message.verify(signature, nonce="abcdef", domain="example.com"):
-except siwe.ValueError:
-    # Invalid message
+    message = SiweMessage.from_message(eip_4361_string)
+    message.verify(signature, nonce="abcdef", domain="example.com")
+except ValueError:
+    # Invalid message format
     print("Authentication attempt rejected.")
 except siwe.ExpiredMessage:
     print("Authentication attempt rejected.")
 except siwe.DomainMismatch:
     print("Authentication attempt rejected.")
 except siwe.NonceMismatch:
-    print("Authentication attempt rejected.")
-except siwe.MalformedSession as e:
-    # e.missing_fields contains the missing information needed for validation
     print("Authentication attempt rejected.")
 except siwe.InvalidSignature:
     print("Authentication attempt rejected.")
@@ -78,9 +75,9 @@ except siwe.InvalidSignature:
 ## Testing
 
 ```bash
-poetry install
 git submodule update --init
-poetry run pytest
+uv sync
+uv run pytest
 ```
 
 ## See Also
