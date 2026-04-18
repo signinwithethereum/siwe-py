@@ -142,8 +142,6 @@ class TestMessageVerification:
         [(test_name, test) for test_name, test in verification_eip1271.items()],
     )
     def test_eip1271_message(self, test_name, test):
-        if test_name == "loopring":
-            pytest.skip()
         provider = HTTPProvider(endpoint_uri=endpoint_uri)
         siwe_message = SiweMessage.from_message(message=test["message"])
         siwe_message.verify(test["signature"], provider=provider)
