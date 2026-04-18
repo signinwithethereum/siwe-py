@@ -67,3 +67,8 @@ markers = [
   "network: tests that require live RPC access",
 ]
 addopts = "-m 'not network'"
+# web3 7.15.0 still imports websockets.legacy (deprecated in websockets 14.0).
+# Drop this once web3 migrates to websockets.asyncio.
+filterwarnings = [
+  "ignore:websockets.legacy is deprecated:DeprecationWarning",
+]
