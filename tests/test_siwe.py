@@ -10,7 +10,13 @@ from web3 import HTTPProvider
 from pydantic import ValidationError
 
 from siwe.grammars.eip4361 import Rule as eip4361_rule
-from siwe.siwe import SiweMessage, VerificationError, datetime_from_iso8601_string
+from siwe.siwe import (
+    ExpiredMessage,
+    InvalidSignature,
+    SiweMessage,
+    VerificationError,
+    datetime_from_iso8601_string,
+)
 
 VECTORS = os.path.join(os.path.dirname(__file__), "../test-vectors/vectors")
 with open(os.path.join(VECTORS, "parsing/parsing_positive.json"), "r") as f:
@@ -203,6 +209,47 @@ class TestMessageRoundTrip:
     def test_schema_generation(self):
         # NOTE: Needed so that FastAPI/OpenAPI json schema works
         SiweMessage.model_json_schema()
+
+
+class TestVerifyHardening:
+    account = Account.create()
+
+    def _build(self, **overrides):
+        fields = dict(
+            domain="ex.com",
+            address=self.account.address,
+            uri="https://ex.com",
+            version="1",
+            chain_id=1,
+            nonce="12345678",
+            issued_at="2024-01-01T00:00:00Z",
+        )
+        fields.update(overrides)
+        return SiweMessage(**fields)
+
+    def test_chain_id_zero_round_trip(self):
+        m = self._build(chain_id=0)
+        assert "Chain ID: 0" in m.prepare_message()
+        parsed = SiweMessage.from_message(m.prepare_message())
+        assert parsed.chain_id == 0
+
+    @pytest.mark.parametrize("bad_sig", ["0xZZ", "0x1", "", "0x", "not-a-signature"])
+    def test_verify_rejects_malformed_signature(self, bad_sig):
+        m = self._build()
+        with pytest.raises(InvalidSignature):
+            m.verify(bad_sig)
+
+    def test_verify_rejects_none_signature(self):
+        m = self._build()
+        with pytest.raises(InvalidSignature):
+            m.verify(None)
+
+    def test_verify_accepts_naive_timestamp(self):
+        from datetime import datetime
+
+        m = self._build(expiration_time="2020-01-01T00:00:00Z")
+        with pytest.raises(ExpiredMessage):
+            m.verify("0x" + "00" * 65, timestamp=datetime(2025, 1, 1))
 
 
 def _get_abnf_rule(rule_name):

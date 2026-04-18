@@ -310,7 +310,7 @@ class SiweMessage(BaseModel):
 
         version_field = f"Version: {self.version}"
 
-        chain_field = f"Chain ID: {self.chain_id or 1}"
+        chain_field = f"Chain ID: {self.chain_id}"
 
         nonce_field = f"Nonce: {self.nonce}"
 
@@ -400,7 +400,12 @@ class SiweMessage(BaseModel):
         if request_id is not None and self.request_id != request_id:
             raise RequestIdMismatch()
 
-        verification_time = utc_now() if timestamp is None else timestamp
+        if timestamp is None:
+            verification_time = utc_now()
+        else:
+            verification_time = timestamp
+            if verification_time.tzinfo is None:
+                verification_time = verification_time.replace(tzinfo=timezone.utc)
         if (
             self.expiration_time is not None
             and verification_time >= self.expiration_time._datetime
@@ -414,7 +419,7 @@ class SiweMessage(BaseModel):
 
         try:
             address = w3.eth.account.recover_message(message, signature=signature)
-        except (ValueError, IndexError):
+        except (ValueError, IndexError, TypeError):
             address = None
         except eth_utils.exceptions.ValidationError:
             raise InvalidSignature from None
@@ -472,10 +477,14 @@ def _check_eip6492_signature(
     address: str, hash_: bytes, signature: str, w3: Web3
 ) -> bool:
     """Verify an EIP-6492 signature using the universal validator bytecode."""
-    sig_bytes = bytes.fromhex(signature[2:]) if signature.startswith("0x") else bytes.fromhex(signature)
+    try:
+        raw = signature[2:] if signature.startswith("0x") else signature
+        sig_bytes = bytes.fromhex(raw)
+    except ValueError:
+        return False
     encoded = w3.codec.encode(
         ["address", "bytes32", "bytes"],
-        [address, hash_, sig_bytes],
+        [Web3.to_checksum_address(address), hash_, sig_bytes],
     )
     data = bytes.fromhex(EIP6492_VALIDATOR_BYTECODE[2:]) + encoded
     try:
@@ -489,13 +498,17 @@ def _check_eip1271_signature(
     address: str, hash_: bytes, signature: str, w3: Web3
 ) -> bool:
     """Verify an EIP-1271 signature via isValidSignature contract call."""
-    contract = w3.eth.contract(address=address, abi=EIP1271_CONTRACT_ABI)
     try:
         # For message hashes stored on-chain for Safe wallets, the signatures
         # are always "0x" and should be passed in as-is.
-        response = contract.caller.isValidSignature(
-            hash_, signature if signature == "0x" else bytes.fromhex(signature[2:])
-        )
+        sig_bytes = signature if signature == "0x" else bytes.fromhex(signature[2:])
+    except ValueError:
+        return False
+    contract = w3.eth.contract(
+        address=Web3.to_checksum_address(address), abi=EIP1271_CONTRACT_ABI
+    )
+    try:
+        response = contract.caller.isValidSignature(hash_, sig_bytes)
         return response.hex() == EIP1271_MAGICVALUE
     except (BadFunctionCallOutput, ContractLogicError, Web3RPCError):
         return False
