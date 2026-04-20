@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Iterable, List, Optional
 
 import abnf
-import eth_utils
 from abnf.grammars import rfc3986
 from eth_account.messages import SignableMessage, _hash_eip191_message, encode_defunct
 from pydantic import (
@@ -368,7 +367,7 @@ class SiweMessage(BaseModel):
 
         suffix = "\n".join(suffix_array)
 
-        if self.statement:
+        if self.statement is not None:
             prefix = "\n\n".join([prefix, self.statement])
         else:
             prefix += "\n"
@@ -377,7 +376,7 @@ class SiweMessage(BaseModel):
 
     def verify(
         self,
-        signature: str,
+        signature: Optional[str],
         *,
         scheme: Optional[str] = None,
         domain: Optional[str] = None,
@@ -449,10 +448,11 @@ class SiweMessage(BaseModel):
 
         try:
             address = w3.eth.account.recover_message(message, signature=signature)
-        except (ValueError, IndexError, TypeError):
+        except Exception:
+            # Any exception from recover_message (wrong length, bad hex, bad
+            # v/r/s, wrong type, None, etc.) means the signature cannot be
+            # validated as an EOA signature — fall through to EIP-1271/6492.
             address = None
-        except eth_utils.exceptions.ValidationError:
-            raise InvalidSignature from None
 
         if (address is None or address.lower() != self.address.lower()) and (
             provider is None

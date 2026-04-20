@@ -270,6 +270,35 @@ class TestVerifyHardening:
         with pytest.raises(ExpiredMessage):
             m.verify("0x" + "00" * 65, timestamp=datetime(2025, 1, 1))
 
+    @pytest.mark.parametrize(
+        "bad_sig",
+        [
+            "0x" + "00" * 65,
+            "0x" + "ff" * 65,
+            "0x" + "00" * 30,
+        ],
+    )
+    def test_verify_wraps_bad_signature_as_invalid(self, bad_sig):
+        m = self._build()
+        with pytest.raises(InvalidSignature):
+            m.verify(bad_sig)
+
+    def test_empty_statement_round_trip(self):
+        m = self._build(statement="")
+        msg = m.prepare_message()
+        reparsed = SiweMessage.from_message(msg)
+        assert reparsed.statement == ""
+        assert reparsed.prepare_message() == msg
+
+    def test_empty_statement_signature_round_trip(self):
+        m = self._build(statement="")
+        prepared = m.prepare_message()
+        signature = self.account.sign_message(
+            messages.encode_defunct(text=prepared)
+        ).signature
+        parsed = SiweMessage.from_message(prepared)
+        parsed.verify(signature)
+
 
 class TestFieldValidation:
     base = dict(
