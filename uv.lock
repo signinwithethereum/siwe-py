@@ -1632,7 +1632,7 @@ wheels = [
 ]
 
 [[package]]
-name = "siwe"
+name = "signinwithethereum"
 version = "5.0.0"
 source = { editable = "." }
 dependencies = [

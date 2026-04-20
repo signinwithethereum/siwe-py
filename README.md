@@ -7,7 +7,13 @@ This package provides a Python implementation of EIP-4361: Sign in With Ethereum
 SIWE can be easily installed in any Python project with pip:
 
 ```bash
-pip install siwe
+pip install signinwithethereum
+```
+
+The distribution is published as `signinwithethereum`, but the import name remains `siwe`:
+
+```python
+from siwe import SiweMessage
 ```
 
 ## Usage
@@ -37,7 +43,7 @@ Verification and authentication is performed via EIP-191, using the `address` fi
 try:
     message.verify(signature="0x...")
     # You can also specify other checks (e.g. the nonce or domain expected).
-except siwe.ValidationError:
+except siwe.VerificationError:
     # Invalid
 ```
 

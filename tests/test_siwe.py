@@ -6,8 +6,9 @@ import pytest
 from abnf.grammars import rfc3986
 from eth_account import Account, messages
 from humps import decamelize
-from web3 import HTTPProvider
 from pydantic import ValidationError
+from web3 import HTTPProvider
+from web3.providers.base import BaseProvider
 
 from siwe.grammars.eip4361 import Rule as eip4361_rule
 from siwe.siwe import (
@@ -64,6 +65,18 @@ try:
         sepolia_endpoint_uri = uri
 except KeyError:
     pass
+
+
+class StaticChainProvider(BaseProvider):
+    def make_request(self, method, params):
+        if method == "eth_chainId":
+            return {"jsonrpc": "2.0", "id": 1, "result": "0x1"}
+        if method in ("eth_call", "eth_getCode"):
+            return {"jsonrpc": "2.0", "id": 1, "result": "0x"}
+        raise AssertionError(f"Unexpected RPC method: {method}")
+
+    def is_connected(self, show_traceback=False):
+        return True
 
 
 class TestMessageParsing:
@@ -239,6 +252,12 @@ class TestVerifyHardening:
         with pytest.raises(InvalidSignature):
             m.verify(bad_sig)
 
+    @pytest.mark.parametrize("bad_sig", ["0xZZ", "0x1", "", None, "not-a-signature"])
+    def test_verify_rejects_malformed_signature_with_provider(self, bad_sig):
+        m = self._build()
+        with pytest.raises(InvalidSignature):
+            m.verify(bad_sig, provider=StaticChainProvider())
+
     def test_verify_rejects_none_signature(self):
         m = self._build()
         with pytest.raises(InvalidSignature):
@@ -274,6 +293,36 @@ class TestFieldValidation:
     def test_accepts_valid_scheme(self):
         m = SiweMessage(**{**self.base, "scheme": "https"})
         assert m.scheme == "https"
+
+    @pytest.mark.parametrize("statement", ["hi\tthere", "hi☃", "line\nbreak"])
+    def test_rejects_invalid_statement_chars(self, statement):
+        with pytest.raises(ValidationError):
+            SiweMessage(**{**self.base, "statement": statement})
+
+    def test_rejects_request_id_newline_injection(self):
+        with pytest.raises(ValidationError):
+            SiweMessage(
+                **{
+                    **self.base,
+                    "request_id": "abc\nResources:\n- https://evil.example",
+                }
+            )
+
+    @pytest.mark.parametrize("field", ["issued_at", "expiration_time", "not_before"])
+    @pytest.mark.parametrize(
+        "timestamp",
+        ["2024-01-01 00:00:00Z", "2024-01-01T00:00:00", "2024-01-01t00:00:00z"],
+    )
+    def test_rejects_non_rfc3339_timestamps(self, field, timestamp):
+        with pytest.raises(ValidationError):
+            SiweMessage(**{**self.base, field: timestamp})
+
+    def test_empty_request_id_round_trip(self):
+        m = SiweMessage(**{**self.base, "request_id": ""})
+        msg = m.prepare_message()
+        assert msg.endswith("Request ID: ")
+        reparsed = SiweMessage.from_message(msg)
+        assert reparsed.request_id == ""
 
     def test_empty_resources_round_trip(self):
         m = SiweMessage(**{**self.base, "resources": []})

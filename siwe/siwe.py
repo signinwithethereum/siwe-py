@@ -23,6 +23,7 @@ from typing_extensions import Annotated
 from web3 import HTTPProvider, Web3
 from web3.exceptions import BadFunctionCallOutput, ContractLogicError, Web3RPCError
 
+from .grammars import eip4361
 from .parsed import ABNFParsedMessage, RegExpParsedMessage
 
 EIP1271_CONTRACT_ABI = [
@@ -53,6 +54,8 @@ EIP6492_VALIDATOR_BYTECODE = "0x608060405234801561001057600080fd5b50604051610694
 
 def is_eip6492_signature(signature: str) -> bool:
     """Check if a hex-encoded signature ends with the EIP-6492 magic suffix."""
+    if not isinstance(signature, str):
+        return False
     sig = signature[2:] if signature.startswith("0x") else signature
     return len(sig) >= 64 and sig.endswith(EIP6492_MAGIC_SUFFIX)
 
@@ -152,11 +155,21 @@ def _validate_rfc3986_uri(value: str) -> str:
     return value
 
 
+def _validate_eip4361_rule(rule_name: str, value: str) -> str:
+    """Validate a string against an EIP-4361 ABNF rule."""
+    try:
+        eip4361.Rule(rule_name).parse_all(value)
+    except abnf.ParseError as err:
+        raise ValueError(f"Invalid {rule_name}: {value}") from err
+    return value
+
+
 AnyUrlStr = Annotated[str, BeforeValidator(_validate_rfc3986_uri)]
 
 
 def datetime_from_iso8601_string(val: str) -> datetime:
     """Convert an ISO-8601 Datetime string into a valid datetime object."""
+    _validate_eip4361_rule("issued-at", val)
     return datetime.fromisoformat(val.replace(".000Z", "Z").replace("Z", "+00:00"))
 
 
@@ -224,7 +237,7 @@ class SiweMessage(BaseModel):
     characters. Use generate_nonce() to generate a secure nonce and store it for
     verification later.
     """
-    statement: Optional[str] = Field(None, pattern="^[^\n]*$")
+    statement: Optional[str] = None
     """Human-readable ASCII assertion that the user will sign, and it must not contain
     `\n`.
     """
@@ -268,6 +281,22 @@ class SiweMessage(BaseModel):
             and not Web3.is_checksum_address(v)
         ):
             raise ValueError("invalid EIP-55 address")
+        return v
+
+    @field_validator("statement")
+    @classmethod
+    def validate_statement(cls, v: Optional[str]) -> Optional[str]:
+        """Validate statement using the EIP-4361 grammar."""
+        if v is not None:
+            _validate_eip4361_rule("statement", v)
+        return v
+
+    @field_validator("request_id")
+    @classmethod
+    def validate_request_id(cls, v: Optional[str]) -> Optional[str]:
+        """Validate request ID using the EIP-4361 grammar."""
+        if v is not None:
+            _validate_eip4361_rule("request-id", v)
         return v
 
     @model_validator(mode="after")
@@ -327,7 +356,7 @@ class SiweMessage(BaseModel):
             not_before_field = f"Not Before: {self.not_before}"
             suffix_array.append(not_before_field)
 
-        if self.request_id:
+        if self.request_id is not None:
             request_id_field = f"Request ID: {self.request_id}"
             suffix_array.append(request_id_field)
 
@@ -371,10 +400,9 @@ class SiweMessage(BaseModel):
         :param request_id: Request ID expected to be in the current message.
         :param timestamp: Timestamp used to verify the expiry date and other dates
         fields. Uses the current time by default.
-        :param provider: A Web3 provider able to perform a contract check, this is
-        required if support for Smart Contract Wallets that implement EIP-1271 is
-        needed. It is also configurable with the environment variable
-        `WEB3_HTTP_PROVIDER_URI`
+        :param provider: A Web3 provider able to perform a contract check. This is
+        required if support for Smart Contract Wallets that implement EIP-1271 or
+        EIP-6492 is needed.
         :param strict: When True, requires uri and chain_id parameters to be provided.
         :return: None if the message is valid and raises an exception otherwise
         """
@@ -482,7 +510,7 @@ def _check_eip6492_signature(
     try:
         raw = signature[2:] if signature.startswith("0x") else signature
         sig_bytes = bytes.fromhex(raw)
-    except ValueError:
+    except (AttributeError, TypeError, ValueError):
         return False
     encoded = w3.codec.encode(
         ["address", "bytes32", "bytes"],
@@ -503,8 +531,9 @@ def _check_eip1271_signature(
     try:
         # For message hashes stored on-chain for Safe wallets, the signatures
         # are always "0x" and should be passed in as-is.
-        sig_bytes = signature if signature == "0x" else bytes.fromhex(signature[2:])
-    except ValueError:
+        raw = signature[2:] if signature.startswith("0x") else signature
+        sig_bytes = signature if signature == "0x" else bytes.fromhex(raw)
+    except (AttributeError, TypeError, ValueError):
         return False
     contract = w3.eth.contract(
         address=Web3.to_checksum_address(address), abi=EIP1271_CONTRACT_ABI
