@@ -37,7 +37,7 @@ message = SiweMessage(domain="login.xyz", address="0x1234...", ...)
 
 ### Verifying and Authenticating a SIWE Message
 
-Verification and authentication is performed via EIP-191, using the `address` field of the `SiweMessage` as the expected signer. The validate method checks message structural integrity, signature address validity, and time-based validity attributes.
+Verification and authentication is performed via EIP-191, using the `address` field of the `SiweMessage` as the expected signer. The `verify` method checks message structural integrity, signature address validity, and time-based validity attributes.
 
 ```python
 try:
