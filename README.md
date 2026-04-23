@@ -47,6 +47,32 @@ except siwe.VerificationError:
     # Invalid
 ```
 
+### Smart-contract wallet signatures (EIP-1271 / EIP-6492)
+
+For signatures produced by contract wallets (Safe, Argent, etc.) rather than
+externally owned accounts, pass a `web3` provider to `verify`:
+
+```python
+from web3 import HTTPProvider
+
+message.verify(
+    signature="0x...",
+    provider=HTTPProvider("https://mainnet.infura.io/v3/..."),
+)
+```
+
+EOA recovery is tried first; if it fails, the signature is checked on-chain via
+`isValidSignature(bytes32,bytes)` per EIP-1271. Signatures carrying the EIP-6492
+magic suffix are handed to the universal off-chain validator bytecode via
+`eth_call`, which covers counterfactual (undeployed) wallets as well as
+already-deployed ones. The provider's chain id is checked against the message's
+`chainId` before any on-chain call.
+
+Note: this is verification only. EIP-6492 allows a verifier to optionally
+submit the factory transaction after a successful check to finalize on-chain
+deployment ("side-effectful" verification). This library does not do that — if
+you need the wallet actually deployed, submit the factory call yourself.
+
 ### Serialization of a SIWE Message
 
 `SiweMessage` instances can also be serialized as their EIP-4361 string representations via the `prepare_message` method:
