@@ -367,7 +367,46 @@ class TestFieldValidation:
     def test_strict_mode_requires_domain(self):
         m = SiweMessage(**self.base)
         with pytest.raises(VerificationError):
-            m.verify("0x" + "00" * 65, uri="https://ex.com", chain_id=1, strict=True)
+            m.verify(
+                "0x" + "00" * 65,
+                uri="https://ex.com",
+                chain_id=1,
+                nonce="12345678",
+                strict=True,
+            )
+
+    def test_strict_mode_requires_uri(self):
+        m = SiweMessage(**self.base)
+        with pytest.raises(VerificationError):
+            m.verify(
+                "0x" + "00" * 65,
+                domain="ex.com",
+                chain_id=1,
+                nonce="12345678",
+                strict=True,
+            )
+
+    def test_strict_mode_requires_chain_id(self):
+        m = SiweMessage(**self.base)
+        with pytest.raises(VerificationError):
+            m.verify(
+                "0x" + "00" * 65,
+                domain="ex.com",
+                uri="https://ex.com",
+                nonce="12345678",
+                strict=True,
+            )
+
+    def test_strict_mode_requires_nonce(self):
+        m = SiweMessage(**self.base)
+        with pytest.raises(VerificationError):
+            m.verify(
+                "0x" + "00" * 65,
+                domain="ex.com",
+                uri="https://ex.com",
+                chain_id=1,
+                strict=True,
+            )
 
 
 def _get_abnf_rule(rule_name):

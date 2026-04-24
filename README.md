@@ -39,13 +39,24 @@ message = SiweMessage(domain="login.xyz", address="0x1234...", ...)
 
 Verification and authentication is performed via EIP-191, using the `address` field of the `SiweMessage` as the expected signer. The `verify` method checks message structural integrity, signature address validity, and time-based validity attributes.
 
+Replay protection relies on a **single-use nonce** that your server issues, stores alongside the pending session, passes to `verify`, and consumes on success. Always pass the `nonce` you issued — a signature verified without a nonce check can be replayed.
+
 ```python
 try:
-    message.verify(signature="0x...")
-    # You can also specify other checks (e.g. the nonce or domain expected).
+    message.verify(
+        signature="0x...",
+        domain="example.com",
+        nonce=expected_nonce,  # the nonce your server issued for this session
+        uri="https://example.com/login",
+        chain_id=1,
+        strict=True,
+    )
+    # Consume the nonce now so it cannot be replayed.
 except siwe.VerificationError:
     # Invalid
 ```
+
+Passing `strict=True` enforces that `domain`, `uri`, `chain_id`, and `nonce` are all supplied. Prefer it for authentication flows.
 
 ### Smart-contract wallet signatures (EIP-1271 / EIP-6492)
 
@@ -88,7 +99,14 @@ Parsing and verifying a `SiweMessage` is easy:
 ```python
 try:
     message = SiweMessage.from_message(eip_4361_string)
-    message.verify(signature, nonce="abcdef", domain="example.com")
+    message.verify(
+        signature,
+        domain="example.com",
+        nonce=expected_nonce,
+        uri="https://example.com/login",
+        chain_id=1,
+        strict=True,
+    )
 except ValueError:
     # Invalid message format
     print("Authentication attempt rejected.")

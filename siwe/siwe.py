@@ -402,16 +402,21 @@ class SiweMessage(BaseModel):
         :param provider: A Web3 provider able to perform a contract check. This is
         required if support for Smart Contract Wallets that implement EIP-1271 or
         EIP-6492 is needed.
-        :param strict: When True, requires uri and chain_id parameters to be provided.
+        :param strict: When True, requires domain, uri, chain_id, and nonce
+        parameters to be provided. The nonce must be a single-use value issued by
+        the relying party and consumed on successful verification — reusing the
+        same nonce across sessions defeats replay protection.
         :return: None if the message is valid and raises an exception otherwise
         """
         if strict:
+            if domain is None:
+                raise VerificationError("Strict mode requires domain parameter")
             if uri is None:
                 raise VerificationError("Strict mode requires uri parameter")
             if chain_id is None:
                 raise VerificationError("Strict mode requires chain_id parameter")
-            if domain is None:
-                raise VerificationError("Strict mode requires domain parameter")
+            if nonce is None:
+                raise VerificationError("Strict mode requires nonce parameter")
 
         message = encode_defunct(text=self.prepare_message())
         w3 = Web3(provider=provider)
