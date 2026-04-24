@@ -10,7 +10,7 @@ SIWE can be easily installed in any Python project with pip:
 pip install signinwithethereum
 ```
 
-The distribution is published as `signinwithethereum`, but the import name remains `siwe`:
+The distribution is published as `signinwithethereum`; the import name is `siwe`:
 
 ```python
 from siwe import SiweMessage
@@ -61,13 +61,20 @@ Passing `strict=True` enforces that `domain`, `uri`, `chain_id`, and `nonce` are
 ### Smart-contract wallet signatures (EIP-1271 / EIP-6492)
 
 For signatures produced by contract wallets (Safe, Argent, etc.) rather than
-externally owned accounts, pass a `web3` provider to `verify`:
+externally owned accounts, pass a `web3` provider to `verify`. The
+authentication arguments (`strict`, `domain`, `nonce`, `uri`, `chain_id`) still
+apply — the provider only changes how the signature itself is verified:
 
 ```python
 from web3 import HTTPProvider
 
 message.verify(
     signature="0x...",
+    domain="example.com",
+    nonce=expected_nonce,
+    uri="https://example.com/login",
+    chain_id=1,
+    strict=True,
     provider=HTTPProvider("https://mainnet.infura.io/v3/..."),
 )
 ```
@@ -77,7 +84,7 @@ EOA recovery is tried first; if it fails, the signature is checked on-chain via
 magic suffix are handed to the universal off-chain validator bytecode via
 `eth_call`, which covers counterfactual (undeployed) wallets as well as
 already-deployed ones. The provider's chain id is checked against the message's
-`chainId` before any on-chain call.
+`chain_id` before any on-chain call.
 
 Note: this is verification only. EIP-6492 allows a verifier to optionally
 submit the factory transaction after a successful check to finalize on-chain
@@ -119,7 +126,7 @@ except siwe.NonceMismatch:
 except siwe.InvalidSignature:
     print("Authentication attempt rejected.")
 
-# Message has been verified. Authentication complete. Continue with authorization/other.
+# Message has been verified. Invalidate the stored nonce, then continue with authorization/other.
 ```
 
 ## Testing
