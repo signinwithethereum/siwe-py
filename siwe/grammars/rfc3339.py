@@ -5,15 +5,8 @@ from typing import ClassVar, List
 from abnf.grammars.misc import load_grammar_rules
 from abnf.parser import Rule as _Rule
 
-from . import rfc5234
 
-
-@load_grammar_rules(
-    [
-        # RFC 5234
-        ("DIGIT", rfc5234.Rule("DIGIT")),
-    ]
-)
+@load_grammar_rules()
 class Rule(_Rule):
     """Rules from RFC 3339."""
 
