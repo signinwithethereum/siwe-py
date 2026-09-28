@@ -1,5 +1,7 @@
 import json
 import os
+import subprocess
+import sys
 
 import abnf
 import pytest
@@ -541,3 +543,16 @@ class TestValidSpecification:
         siwe_message = SiweMessage.from_message(message=test["msg"], abnf=abnf_mode)
         for key, value in test["items"].items():
             assert getattr(siwe_message, key) == value
+
+
+def test_grammar_loads_without_grammar_warnings():
+    # Grammars load once per process at import, so check in a fresh interpreter.
+    code = (
+        "import warnings, abnf\n"
+        "warnings.simplefilter('error', getattr(abnf, 'GrammarWarning', UserWarning))\n"
+        "import siwe.grammars.eip4361\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr

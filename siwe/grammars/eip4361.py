@@ -6,7 +6,7 @@ from abnf.grammars import rfc3986
 from abnf.grammars.misc import load_grammar_rules
 from abnf.parser import Rule as _Rule
 
-from . import rfc3339, rfc5234
+from . import rfc3339
 
 
 @load_grammar_rules(
@@ -17,13 +17,7 @@ from . import rfc3339, rfc5234
         ("scheme", rfc3986.Rule("scheme")),
         ("reserved", rfc3986.Rule("reserved")),
         ("unreserved", rfc3986.Rule("unreserved")),
-        ("reserved", rfc3986.Rule("reserved")),
         ("pchar", rfc3986.Rule("pchar")),
-        # RFC 5234
-        ("LF", rfc5234.Rule("LF")),
-        ("HEXDIG", rfc5234.Rule("HEXDIG")),
-        ("ALPHA", rfc5234.Rule("ALPHA")),
-        ("DIGIT", rfc5234.Rule("DIGIT")),
         # RFC 3339
         ("date-time", rfc3339.Rule("date-time")),
     ]
@@ -41,7 +35,6 @@ class Rule(_Rule):
         "domain = authority",
         'address = "0x" 40HEXDIG',
         'statement = *( reserved / unreserved / " " )',
-        "uri = URI",
         'version = "1"',
         "nonce = 8*( ALPHA / DIGIT )",
         "issued-at = date-time",
