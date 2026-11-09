@@ -8,7 +8,8 @@ from typing import Iterable, List, Optional
 
 import abnf
 from abnf.grammars import rfc3986
-from eth_account.messages import SignableMessage, _hash_eip191_message, encode_defunct
+from eth_account.messages import SignableMessage, encode_defunct
+from eth_utils import keccak
 from pydantic import (
     BaseModel,
     BeforeValidator,
@@ -470,6 +471,14 @@ class SiweMessage(BaseModel):
             )
         ):
             raise InvalidSignature()
+
+
+def _hash_eip191_message(message: SignableMessage) -> bytes:
+    """Compute the EIP-191 hash of a signable message.
+
+    eth-account only exposes this as a private helper, so it is computed here.
+    """
+    return keccak(b"\x19" + message.version + message.header + message.body)
 
 
 def check_contract_wallet_signature(

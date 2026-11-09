@@ -18,6 +18,7 @@ from siwe.siwe import (
     InvalidSignature,
     SiweMessage,
     VerificationError,
+    _hash_eip191_message,
     datetime_from_iso8601_string,
 )
 
@@ -79,6 +80,20 @@ class StaticChainProvider(BaseProvider):
 
     def is_connected(self, show_traceback=False):
         return True
+
+
+class EIP1271MagicValueProvider(StaticChainProvider):
+    """Accepts any EIP-1271 signature and records the eth_call data."""
+
+    def __init__(self):
+        super().__init__()
+        self.call_data = []
+
+    def make_request(self, method, params):
+        if method == "eth_call":
+            self.call_data.append(params[0]["data"])
+            return {"jsonrpc": "2.0", "id": 1, "result": "0x1626ba7e" + "00" * 28}
+        return super().make_request(method, params)
 
 
 class TestMessageParsing:
@@ -259,6 +274,20 @@ class TestVerifyHardening:
         m = self._build()
         with pytest.raises(InvalidSignature):
             m.verify(bad_sig, provider=StaticChainProvider())
+
+    def test_eip191_hash_matches_eth_account(self):
+        text = self._build().prepare_message()
+        assert _hash_eip191_message(
+            messages.encode_defunct(text=text)
+        ) == messages.defunct_hash_message(text=text)
+
+    def test_verify_eip1271_passes_eip191_hash(self):
+        m = self._build(address="0x" + "11" * 20)
+        provider = EIP1271MagicValueProvider()
+        m.verify("0x" + "00" * 65, provider=provider)
+        hash_ = messages.defunct_hash_message(text=m.prepare_message())
+        assert len(provider.call_data) == 1
+        assert provider.call_data[0].startswith("0x1626ba7e" + hash_.hex())
 
     def test_verify_rejects_none_signature(self):
         m = self._build()
