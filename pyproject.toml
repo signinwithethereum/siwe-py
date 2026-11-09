@@ -13,8 +13,8 @@ requires-python = ">=3.10,<4.0"
 keywords = ["SIWE", "EIP-4361", "Sign in with Ethereum"]
 dependencies = [
   "abnf>=2.2,<3",
-  "web3>=7.3.0,<8",
-  "eth-account>=0.13.1,<0.14",
+  "web3>=7.3.0,<9",
+  "eth-account>=0.13.1,<0.15",
   "eth-utils>=2.2.0",
   "pydantic>=2.7,<3",
   "pydantic-core>=2,<3",
@@ -70,8 +70,3 @@ markers = [
   "network: tests that require live RPC access",
 ]
 addopts = "-m 'not network'"
-# web3 7.15.0 still imports websockets.legacy (deprecated in websockets 14.0).
-# Drop this once web3 migrates to websockets.asyncio.
-filterwarnings = [
-  "ignore:websockets.legacy is deprecated:DeprecationWarning",
-]
