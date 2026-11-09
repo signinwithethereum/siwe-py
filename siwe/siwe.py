@@ -20,7 +20,7 @@ from pydantic import (
 )
 from pydantic_core import core_schema
 from typing_extensions import Annotated
-from web3 import HTTPProvider, Web3
+from web3 import BaseProvider, Web3
 from web3.exceptions import BadFunctionCallOutput, ContractLogicError, Web3RPCError
 
 from .grammars import eip4361
@@ -386,7 +386,7 @@ class SiweMessage(BaseModel):
         chain_id: Optional[int] = None,
         request_id: Optional[str] = None,
         timestamp: Optional[datetime] = None,
-        provider: Optional[HTTPProvider] = None,
+        provider: Optional[BaseProvider] = None,
         strict: bool = False,
     ) -> None:
         """Verify the validity of the message and its signature.
@@ -400,9 +400,9 @@ class SiweMessage(BaseModel):
         :param request_id: Request ID expected to be in the current message.
         :param timestamp: Timestamp used to verify the expiry date and other dates
         fields. Uses the current time by default.
-        :param provider: A Web3 provider able to perform a contract check. This is
-        required if support for Smart Contract Wallets that implement EIP-1271 or
-        EIP-6492 is needed.
+        :param provider: A synchronous Web3 provider (e.g. HTTPProvider or
+        IPCProvider) able to perform a contract check. This is required if support
+        for Smart Contract Wallets that implement EIP-1271 or EIP-6492 is needed.
         :param strict: When True, requires domain, uri, chain_id, and nonce
         parameters to be provided. The nonce must be a single-use value issued by
         the relying party and consumed on successful verification — reusing the
